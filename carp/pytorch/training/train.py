@@ -11,7 +11,7 @@ from transformers import PreTrainedModel
 import wandb
 from carp.clock import Clock
 from carp.configs import CARPConfig
-from carp.pytorch.data import BaseDataPipeline, get_datapipeline
+from carp.pytorch.data import BaseDataPipeline, get_datapipeline, get_nlpaug_config
 from carp.pytorch.model.architectures import get_architecture
 from carp.pytorch.scalability_utils import (
     fn_rank_0,
@@ -83,7 +83,14 @@ def get_model(
 
 
 def get_datasets(config, data_path, random_seed=None):
-    dataset = get_datapipeline(config.data_pipeline)(config.dupe_protection, data_path)
+
+    nlpaug = get_nlpaug_config(config)
+
+    if nlpaug is not None:
+        dataset = get_datapipeline(config.data_pipeline)(config.dupe_protection, data_path, nlpaug)
+    else:
+        dataset = get_datapipeline(config.data_pipeline)(config.dupe_protection, data_path)
+
     size = len(dataset)
 
     seed = torch.manual_seed(random_seed)
@@ -291,5 +298,6 @@ if __name__ == "__main__":
 
             # wandb.config.update({"seed": args.seed})
             fn_rank_0(wandb.watch, model)
+
         dataset, evalset = get_datasets(train_config, args.data_path, args.seed)
         train(model, dataset, evalset, trainer, args, multi_gpus)

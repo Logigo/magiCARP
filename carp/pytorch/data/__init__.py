@@ -8,7 +8,7 @@ from datasets import load_from_disk
 from torch.utils.data import Dataset
 from typeguard import typechecked
 
-from carp.pytorch.data.utils.data_util import BatchElement, create_tok
+from carp.pytorch.data.utils.data_util import BatchElement, create_tok, get_nlpaug_config
 from carp.pytorch.model.encoders import BaseEncoder
 
 # specifies a dictionary of architectures
@@ -119,6 +119,7 @@ class BaseDataPipeline(Dataset):
 
 from carp.pytorch.data.mlm_pipeline import MLMDataPipeline
 from carp.pytorch.data.scarecrow_pipeline import ScarecrowDataPipeline
+from carp.pytorch.data.aug_pipeline import AugDataPipeline
 
 
 def get_datapipeline(name):

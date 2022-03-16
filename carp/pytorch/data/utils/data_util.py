@@ -7,6 +7,8 @@ from torchtyping import TensorType
 from transformers.tokenization_utils_base import BatchEncoding
 from typeguard import typechecked
 
+from carp.configs import CARPConfig
+
 
 def check_char(char):
     """Check if char can be encoded"""
@@ -144,3 +146,37 @@ def chunkBatchElement(data: BatchElement, chunk_size: int) -> List[BatchElement]
         new_datas.append(data_class(*data_args))
 
     return new_datas
+
+
+def get_nlpaug_config(config_trainjob):
+    """
+    Args:
+        config: TrainConfig of model
+
+    Returns: A list of NLPAug arguments specified in the model's YML file if the datapipeline=='NLPAug', None otherwise
+
+    """
+    def _process_args_from_yaml(_yaml):
+        return _yaml
+
+    config = config_trainjob
+    # Check if we are using NLPAug's pipeline
+    if config.data_pipeline == 'AugDataPipeline':
+        # Check if NLPAug args were specified in YAML xor path to arguments were specified in YAML
+        if config.aug_args is not None and config.aug_path:
+            raise NotImplementedError(
+                'Can have either an YAML path for NLPAug args, or the arguments specified in this YAML, but not both.'
+            )
+        elif config.aug_args is not None:
+            # Read the arguments from the config file
+            return _process_args_from_yaml(config)
+        elif config.aug_path is not None:
+            # Read the arguments from this config file instead
+            yaml = CARPConfig.load_yaml(config.aug_path).train_job
+            return _process_args_from_yaml(yaml)
+        else:
+            raise NotImplementedError(
+                'Must include arguments to NLPAug augmentations.'
+            )
+    else:
+        return None
