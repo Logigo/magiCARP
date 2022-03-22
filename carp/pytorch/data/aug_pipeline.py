@@ -36,13 +36,15 @@ def extract_augmenter_args(config: dict, key: str) -> Tuple[bool, dict[str, Any]
 @dataclass
 class NLPAugConfig:
     augmenter_sequence: naf.Sequential
-    augment_passage: bool
+    augment_passages: bool
     augment_reviews: bool
 
 
 @register_datapipeline
 class AugDataPipeline(BaseDataPipeline):
     """Dataset wrapper class to ease working with the CARP dataset and Pytorch data utilities."""
+
+    nlpaug_config: NLPAugConfig = None
 
     def __init__(
             self,
@@ -58,6 +60,7 @@ class AugDataPipeline(BaseDataPipeline):
         augment_passages: bool = config.get('augment_passages', False)
 
         if augment_passages and augment_reviews or (not augment_passages and not augment_reviews):
+            # TODO: Replace with a warning instead of completely prohibiting both being set
             raise NotImplementedError(
                 'One of Reviews and Passages should be augmented, but not both.'
             )
@@ -74,7 +77,6 @@ class AugDataPipeline(BaseDataPipeline):
         # Initialize augmenter objects with extracted kwargs
         contextual_word_embedding_aug = nas.ContextualWordEmbsForSentenceAug(**augment_context_embedding) if has_cwe \
             else None
-
         # We don't check for both augment_lambada and model_directory so that it throws an error if a path is not
         # specified and doesn't fail silently
         lambada_aug = nas.LambadaAug(model_directory, **augment_lambada) if has_lambada else None
@@ -85,7 +87,7 @@ class AugDataPipeline(BaseDataPipeline):
                       random_sentence_augmenter]
 
         augmenter_pipeline: naf.Sequential = naf.Sequential([aug for aug in augmenters if aug is not None])
-        self.nlpaug_config: NLPAugConfig = NLPAugConfig(augmenter_pipeline, augment_passages, augment_reviews)
+        AugDataPipeline.nlpaug_config = NLPAugConfig(augmenter_pipeline, augment_passages, augment_reviews)
 
     @staticmethod
     def tokenizer_factory(_tok: Callable, encoder: BaseEncoder) -> Callable:
@@ -99,12 +101,13 @@ class AugDataPipeline(BaseDataPipeline):
             Callable: A function that will take a batch of string tuples and tokenize them properly.
         """
         # TODO: How can I access this?
-        test: AugDataPipeline
+        pipeline_config: NLPAugConfig = AugDataPipeline.nlpaug_config
 
         @typechecked
         def collate(
                 data: Iterable[Tuple[str, str]]
         ) -> Tuple[BatchElement, BatchElement]:
+
             passages, reviews = zip(*data)
             pass_tokens, rev_tokens = _tok(list(passages)), _tok(list(reviews))
             pass_masks = pass_tokens["attention_mask"]
@@ -112,16 +115,30 @@ class AugDataPipeline(BaseDataPipeline):
             pass_tokens = pass_tokens["input_ids"]
             rev_tokens = rev_tokens["input_ids"]
 
-            # Augment pass_tokens, rev_tokens with the self.Sequential() instance. TODO: None of this is correct.
-            if test.augment_reviews:
-                augmented_data = test.augmenter_pipeline.augment(rev_tokens)
-            if test.augment_passages:
-                augmented_data = test.augmenter_pipeline.augment(pass_tokens)
+            new_rev_tokens, new_rev_masks = [*rev_tokens], [*rev_masks]
+            new_pass_tokens, new_pass_masks = [*pass_tokens], [*pass_masks]
+            # Augment pass_tokens, rev_tokens with the Sequential() instance. TODO: None of this is correct. Probably
+            if pipeline_config.augment_reviews:
+                augmented_data = pipeline_config.augmenter_sequence.augment(rev_tokens)
+                multiple = len(augmented_data)
+                # [a, b..z] --> [a, b..z, a+, b+...z+]
+                [new_rev_tokens.extend(augmentation) for augmentation in augmented_data]
+                [new_rev_masks.extend(rev_masks) for _ in augmented_data]
+                new_pass_tokens, new_pass_masks = new_pass_tokens * multiple, new_pass_masks * multiple
+
+            if pipeline_config.augment_passages:
+                augmented_data = pipeline_config.augmenter_sequence.augment(pass_tokens)
+                multiple = len(augmented_data)
+                # [a, b..z] --> [a, b..z, a+, b+...z+]
+                [new_pass_tokens.extend(augmentation) for augmentation in augmented_data]
+                [new_pass_masks.extend(rev_masks) for _ in augmented_data]
+                new_pass_tokens, new_pass_masks = new_pass_tokens * multiple, new_pass_masks * multiple
+
             # TODO: Augmented passages should be paired with their reviews, augmented reviews should be paired with
             #  their passages. Then, either/both should be appended to the tokens/masks? and returned as BatchElements?
             return (
-                BatchElement(pass_tokens, pass_masks),
-                BatchElement(rev_tokens, rev_masks),
+                BatchElement(new_pass_tokens, new_pass_masks),
+                BatchElement(new_rev_tokens, new_rev_masks),
             )
 
         return collate
