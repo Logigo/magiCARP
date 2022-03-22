@@ -5,6 +5,23 @@ import yaml
 
 
 @dataclass
+class DataPipelineConfig:
+    args: Dict[str, Any] = None
+    path: str = ""
+    data_pipeline: str = ""
+
+    @classmethod
+    def load_yaml(cls, yml_fp):
+        with open(yml_fp, mode="r") as file:
+            config = yaml.safe_load(file)
+        return cls(
+            args=config,
+            path=yml_fp,
+            data_pipeline=config.data_pipeline
+        )
+
+
+@dataclass
 class ModelConfig:
     latent_dim: int
     proj_dropout: float
@@ -57,9 +74,9 @@ class TrainConfig:
     mixed_precision: bool = True  # Use AMP mixed precision
     grad_accum: int = 1
     grad_clip: float = -1  # What to clip grad norms to (set to -1 for no clip)
-    # NLPAug attributes:
-    aug_args: Dict[str, Any] = None
-    aug_path: str = ""
+    # TODO: Hmm....
+    pipeline_config_path: str = ""
+    data_pipeline_config = DataPipelineConfig(path=pipeline_config_path)
 
     @classmethod
     def from_dict(cls, config: Dict[str, Any]):

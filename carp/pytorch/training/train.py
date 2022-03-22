@@ -25,6 +25,7 @@ from carp.util import get_scheduling_func
 
 from carp.pytorch.training.utils import make_param_groups
 
+
 def get_arguments():
     parser = ArgumentParser()
     parser.add_argument("--data_path", type=str, required=False)
@@ -60,17 +61,17 @@ def sanity_check(args, config):
 
 
 def get_model(
-    config: CARPConfig, load_checkpoint: bool, model_type: str = "CARP", ckpt_path=None,
-    multi_gpu: bool = False
+        config: CARPConfig, load_checkpoint: bool, model_type: str = "CARP", ckpt_path=None,
+        multi_gpu: bool = False
 ):
     model = get_architecture(model_type)(config.model)
     if load_checkpoint:
         model.load(ckpt_path)
         print_rank_0("Checkpoint loaded!")
-    
+
     if not multi_gpu:
         model.to(config.model.device)
-    else: 
+    else:
         model.cuda()
 
     if config.train_job.use_half:
@@ -83,13 +84,7 @@ def get_model(
 
 
 def get_datasets(config, data_path, random_seed=None):
-
-    nlpaug = get_nlpaug_config(config)
-
-    if nlpaug is not None:
-        dataset = get_datapipeline(config.data_pipeline)(config.dupe_protection, data_path, nlpaug)
-    else:
-        dataset = get_datapipeline(config.data_pipeline)(config.dupe_protection, data_path)
+    dataset = get_datapipeline(config.data_pipeline)(config, data_path)
 
     size = len(dataset)
 
@@ -123,12 +118,12 @@ def save_checkpoint(save_fn, scheduler, opt, iter: int, save_iter: bool):
 
 # Dataset assumed to be list of pairs on memory
 def train(
-    model,
-    dataset: BaseDataPipeline,
-    evalset: BaseDataPipeline,
-    trainer,
-    args,
-    multi_gpus: bool = False,
+        model,
+        dataset: BaseDataPipeline,
+        evalset: BaseDataPipeline,
+        trainer,
+        args,
+        multi_gpus: bool = False,
 ):
     # Tokenizes string batch using encoder tokenizer
     USE_DEEPSPEED = args.deepspeed_config is not None
@@ -151,7 +146,7 @@ def train(
         opt = torch.optim.AdamW(
             make_param_groups(model, trainer.train_config.weight_decay),
             lr=LEARNING_RATE_INIT,
-            betas=(0.9,0.95),
+            betas=(0.9, 0.95),
             eps=trainer.train_config.opt_eps,
         )
         scheduler = LambdaLR(opt, get_scheduling_func(trainer.train_config))
@@ -212,7 +207,7 @@ def train(
             # Checkpoint model and scheduler
             if iteration % trainer.train_config.checkpoint_interval == 0:
                 save_iter = (
-                    iteration % (20 * trainer.train_config.checkpoint_interval) == 0
+                        iteration % (20 * trainer.train_config.checkpoint_interval) == 0
                 )
                 trainer.before_save()
                 fn_rank_0(
@@ -275,9 +270,9 @@ if __name__ == "__main__":
         )
 
         multi_gpus = (
-            args.deepspeed_config is not None
-            and "zero_optimization" in args.deepspeed_config
-            and args.deepspeed_config["zero_optimization"]["stage"] > 0
+                args.deepspeed_config is not None
+                and "zero_optimization" in args.deepspeed_config
+                and args.deepspeed_config["zero_optimization"]["stage"] > 0
         )
 
         if multi_gpus is True:

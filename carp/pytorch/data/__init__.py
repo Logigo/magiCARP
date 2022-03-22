@@ -8,6 +8,7 @@ from datasets import load_from_disk
 from torch.utils.data import Dataset
 from typeguard import typechecked
 
+from carp.configs import TrainConfig
 from carp.pytorch.data.utils.data_util import BatchElement, create_tok, get_nlpaug_config
 from carp.pytorch.model.encoders import BaseEncoder
 
@@ -44,9 +45,10 @@ class BaseDataPipeline(Dataset):
 
     def __init__(
         self,
-        dupe_protection: bool = True,
+        config: TrainConfig,
         path: str = "dataset",
     ):
+        dupe_protection: bool = config.dupe_protection
         dataset = load_from_disk(path)
         train = dataset["train"]
         passages = train["story_target"]
@@ -72,7 +74,7 @@ class BaseDataPipeline(Dataset):
 
     @staticmethod
     def create_tokenizer_factory(
-        call_tokenizer: Callable, tokenizer_factory: Callable, context_len: int
+        call_tokenizer: Callable, tokenizer_factory: Callable, _config: TrainConfig
     ) -> Callable:
 
         """Function creates a callable tokenizer subroutine and uses it to curry the tokenizer factory
@@ -80,15 +82,17 @@ class BaseDataPipeline(Dataset):
         Args:
             call_tokenizer (Callable): A function defined within BaseEncoder that outlines a custom encoder processing step
             tokenizer_factory (Callable): The factory we wish to initialize
-            context_len (int): Max context length of a batch element.
+            config (TrainConfig): Train configuration of training session
         Returns:
             Callable: A function that create a factory that will take a batch of string tuples and tokenize them properly.
         """
+        context_len = _config.n_ctx
         tok_func = create_tok(call_tokenizer, context_len=context_len)
-        return partial(tokenizer_factory, tok_func)
+        # TODO: Not sure if config is in the right place here..
+        return partial(tokenizer_factory, tok_func, _config)
 
     @staticmethod
-    def tokenizer_factory(_tok: Callable, encoder: BaseEncoder) -> Callable:
+    def tokenizer_factory(_tok: Callable, encoder: BaseEncoder, config: TrainConfig) -> Callable:
 
         """Function factory that creates a collate function for use with a torch.util.data.Dataloader
 
