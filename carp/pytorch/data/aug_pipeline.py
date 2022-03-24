@@ -117,38 +117,28 @@ class AugDataPipeline(BaseDataPipeline):
         ) -> Tuple[BatchElement, BatchElement]:
 
             passages, reviews = zip(*data)
-            pass_tokens, rev_tokens = _tok(list(passages)), _tok(list(reviews))
+            # Augmentation happens here
+            augmented_passages: list[str] = passages
+            augmented_reviews: list[str] = reviews
+            # TODO: Add Flow args to config to pass into augmenterseqeunce.augment
+            # TODO: Should we be able to augment both?
+            # TODO: Superclass kwargs shouild go to config file
+            if pipeline_config.augment_reviews:
+                augmented_reviews = pipeline_config.augmenter_sequence.augment(augmented_reviews)
+
+            if pipeline_config.augment_passages:
+                augmented_passages = pipeline_config.augmenter_sequence.augment(augmented_passages)
+            # [a, b, c] --> [1, 2, 3]
+            # [a+, b+, c+] --> [1, 2, 3]
+            pass_tokens, rev_tokens = _tok(augmented_passages), _tok(augmented_reviews)
             pass_masks = pass_tokens["attention_mask"]
             rev_masks = rev_tokens["attention_mask"]
             pass_tokens = pass_tokens["input_ids"]
             rev_tokens = rev_tokens["input_ids"]
 
-            new_rev_tokens, new_rev_masks = [*rev_tokens], [*rev_masks]
-            new_pass_tokens, new_pass_masks = [*pass_tokens], [*pass_masks]
-            # Augment pass_tokens, rev_tokens with the Sequential() instance. TODO: None of this is correct. Probably
-            if pipeline_config.augment_reviews:
-                augment_labels_tokens(rev_tokens, pass_tokens, 'reviews')
-                augmented_data = pipeline_config.augmenter_sequence.augment(rev_tokens)
-                multiple = len(augmented_data)
-                # [a, b..z] --> [a, b..z, a+, b+...z+]
-                [new_rev_tokens.extend(augmentation) for augmentation in augmented_data]
-                [new_rev_masks.extend(rev_masks) for _ in augmented_data]
-                new_pass_tokens, new_pass_masks = new_pass_tokens * multiple, new_pass_masks * multiple
-
-            if pipeline_config.augment_passages:
-                augment_labels_tokens(rev_tokens, pass_tokens, 'passages')
-                augmented_data = pipeline_config.augmenter_sequence.augment(pass_tokens)
-                multiple = len(augmented_data)
-                # [a, b..z] --> [a, b..z, a+, b+...z+]
-                [new_pass_tokens.extend(augmentation) for augmentation in augmented_data]
-                [new_pass_masks.extend(rev_masks) for _ in augmented_data]
-                new_pass_tokens, new_pass_masks = new_pass_tokens * multiple, new_pass_masks * multiple
-
-            # TODO: Augmented passages should be paired with their reviews, augmented reviews should be paired with
-            #  their passages. Then, either/both should be appended to the tokens/masks? and returned as BatchElements?
             return (
-                BatchElement(new_pass_tokens, new_pass_masks),
-                BatchElement(new_rev_tokens, new_rev_masks),
+                BatchElement(pass_tokens, pass_masks),
+                BatchElement(rev_tokens, rev_masks),
             )
 
         return collate

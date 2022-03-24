@@ -243,9 +243,9 @@ class BaseTrainer(object):
     def construct_dataloader(
         self, dataset: BaseDataPipeline, tokenizer: Callable, multi_gpus: bool
     ) -> DataLoader:
-        # sampler = RandomSampler(dataset)
+        sampler = RandomSampler(dataset, num_samples=len(dataset))
         # TODO: This is temporary!!! REMOVE IT LATER!!
-        sampler = SequentialSampler(dataset)
+        # sampler = SequentialSampler(dataset)
         if multi_gpus is True:
             sampler = DistributedSamplerWrapper(
                 sampler=sampler,
