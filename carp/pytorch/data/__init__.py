@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 from typeguard import typechecked
 
 from carp.configs import TrainConfig
-from carp.pytorch.data.utils.data_util import BatchElement, create_tok, get_nlpaug_config
+from carp.pytorch.data.utils.data_util import BatchElement, create_tok
 from carp.pytorch.model.encoders import BaseEncoder
 
 # specifies a dictionary of architectures
@@ -50,9 +50,9 @@ class BaseDataPipeline(Dataset):
     ):
         dupe_protection: bool = config.dupe_protection
         dataset = load_from_disk(path)
-        train = dataset["train"]
-        passages = train["story_target"]
-        reviews = train["target_comment"]
+        # train = dataset["train"]
+        passages = dataset["story_target"]
+        reviews = dataset["target_comment"]
         if dupe_protection:
             size = len(passages)
             i = 0
@@ -80,15 +80,14 @@ class BaseDataPipeline(Dataset):
         """Function creates a callable tokenizer subroutine and uses it to curry the tokenizer factory
 
         Args:
+            _config (TrainConfig): Train configuration of training session
             call_tokenizer (Callable): A function defined within BaseEncoder that outlines a custom encoder processing step
             tokenizer_factory (Callable): The factory we wish to initialize
-            config (TrainConfig): Train configuration of training session
         Returns:
             Callable: A function that create a factory that will take a batch of string tuples and tokenize them properly.
         """
         context_len = _config.n_ctx
         tok_func = create_tok(call_tokenizer, context_len=context_len)
-        # TODO: Not sure if config is in the right place here..
         return partial(tokenizer_factory, tok_func, _config)
 
     @staticmethod
@@ -97,6 +96,7 @@ class BaseDataPipeline(Dataset):
         """Function factory that creates a collate function for use with a torch.util.data.Dataloader
 
         Args:
+            config:
             _tok (Callable): A Huggingface model tokenizer, taking strings to torch Tensors
             encoder (BaseEncoder): A CARP base encoder module.
         Returns:

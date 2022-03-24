@@ -32,11 +32,4 @@ train_job:
   gradient_checkpointing: true
   grad_clip: -1.0
   grad_accum: 4
-  aug_args:
-    augment_passages: true
-    augment_reviews: false
-    augment_context_embedding: true
-    augment_lambada: true
-    lambada_model_directory: ""
-    augment_abstractive_summarization: true
-    augment_random_behavior: true
+  pipeline_config_path: 'C:\Users\Sami\PycharmProjects\magiCARP\configs\nlpaug_arguments_example.yml'

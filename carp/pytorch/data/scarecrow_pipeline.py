@@ -59,7 +59,7 @@ class ScarecrowDataPipeline(BaseDataPipeline):
 
     def __init__(
         self,
-        dupe_protection: bool = True,
+        config: TrainConfig,
         path: str = "dataset",
     ):
         # We'll load scarecrow by default but in the future I hope to have a very standardized format
@@ -107,12 +107,13 @@ class ScarecrowDataPipeline(BaseDataPipeline):
         # super().__init__(dupe_protection, path)
 
     @staticmethod
-    def tokenizer_factory(_tok: Callable, encoder: BaseEncoder) -> Callable:
+    def tokenizer_factory(_tok: Callable, encoder: BaseEncoder, _config: TrainConfig) -> Callable:
         """Function factory that creates a collate function for use with a torch.util.data.Dataloader
 
         Args:
-            tokenizer (PreTrainedTokenizer): A Huggingface model tokenizer, taking strings to torch Tensors
-            context_len (int): Max length of the passages passed to the tokenizer
+            _config:
+            encoder:
+            _tok:
 
         Returns:
             Callable: A function that will take a batch of string tuples and tokenize them properly.

@@ -27,11 +27,16 @@ def extract_augmenter_args(config: dict, key: str) -> Tuple[bool, dict[str, Any]
 
 
     """
-    aug: dict or bool = config.get(key, None)
-    if type(aug) is bool:
-        return True, dict()
-
-    return aug is None, aug
+    if key in config:
+        arg: dict or bool = config.get(key)
+        if type(arg) is bool:
+            if arg:
+                arg = dict()
+            else: # When the config file explicitly specifies not to use the augment via a bool
+                return False, None
+        return True, arg
+    else:
+        return False, None
 
 
 @dataclass
@@ -41,8 +46,8 @@ class NLPAugConfig:
     augment_reviews: bool
 
 
-def get_nlpaug_config(config: TrainConfig) -> NLPAugConfig:
-    pipeline_config: DataPipelineConfig = config.data_pipeline_config
+def get_nlpaug_config(path: str) -> NLPAugConfig:
+    pipeline_config: DataPipelineConfig = DataPipelineConfig.load_yaml(path)
     args: dict = pipeline_config.args
     augment_reviews: bool = args.get('augment_reviews', False)
     augment_passages: bool = args.get('augment_passages', False)
@@ -76,6 +81,7 @@ def get_nlpaug_config(config: TrainConfig) -> NLPAugConfig:
 
 
 def augment_labels_tokens() -> TensorType:
+    # TODO
     pass
 
 
@@ -88,12 +94,10 @@ class AugDataPipeline(BaseDataPipeline):
             config: TrainConfig,
             path: str = "dataset"
     ):
-        # TODO: I don't have the data locally (or the path, by extension), so I have to comment this out for it to run
         super(AugDataPipeline, self).__init__(config, path)
-        # Probably not both should be true
 
     @staticmethod
-    def tokenizer_factory(_tok: Callable, encoder: BaseEncoder, _config: TrainConfig) -> Callable:
+    def tokenizer_factory(_tok: Callable, _config: TrainConfig, encoder: BaseEncoder) -> Callable:
         """Function factory that creates a collate function for use with a torch.util.data.Dataloader
 
         Args:
@@ -105,7 +109,7 @@ class AugDataPipeline(BaseDataPipeline):
             Callable: A function that will take a batch of string tuples and tokenize them properly.
         """
 
-        pipeline_config: NLPAugConfig = get_nlpaug_config(_config.data_pipeline_config)
+        pipeline_config: NLPAugConfig = get_nlpaug_config(_config.pipeline_config_path)
 
         @typechecked
         def collate(

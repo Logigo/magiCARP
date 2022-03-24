@@ -10,7 +10,7 @@ from catalyst.data import DistributedSamplerWrapper
 from torch import no_grad
 from torch.cuda.amp import autocast
 from torch.utils.data import DataLoader
-from torch.utils.data.sampler import RandomSampler
+from torch.utils.data.sampler import RandomSampler, SequentialSampler
 
 from carp.configs import TrainConfig
 from carp.pytorch.data import BaseDataPipeline, get_datapipeline
@@ -243,8 +243,9 @@ class BaseTrainer(object):
     def construct_dataloader(
         self, dataset: BaseDataPipeline, tokenizer: Callable, multi_gpus: bool
     ) -> DataLoader:
-        sampler = RandomSampler(dataset)
-
+        # sampler = RandomSampler(dataset)
+        # TODO: This is temporary!!! REMOVE IT LATER!!
+        sampler = SequentialSampler(dataset)
         if multi_gpus is True:
             sampler = DistributedSamplerWrapper(
                 sampler=sampler,
@@ -266,7 +267,7 @@ class BaseTrainer(object):
         tokenizer = get_datapipeline(
             self.train_config.data_pipeline
         ).create_tokenizer_factory(
-            call_tokenizer, tokenizer_factory, self.train_config.n_ctx
+            call_tokenizer, tokenizer_factory, self.train_config
         )
         return tokenizer(passage_encoder)
 

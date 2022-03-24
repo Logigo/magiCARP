@@ -13,11 +13,11 @@ class DataPipelineConfig:
     @classmethod
     def load_yaml(cls, yml_fp):
         with open(yml_fp, mode="r") as file:
-            config = yaml.safe_load(file)
+            config: dict = yaml.safe_load(file)
         return cls(
             args=config,
             path=yml_fp,
-            data_pipeline=config.data_pipeline
+            data_pipeline=config.get('data_pipeline', '')
         )
 
 
@@ -76,7 +76,6 @@ class TrainConfig:
     grad_clip: float = -1  # What to clip grad norms to (set to -1 for no clip)
     # TODO: Hmm....
     pipeline_config_path: str = ""
-    data_pipeline_config = DataPipelineConfig(path=pipeline_config_path)
 
     @classmethod
     def from_dict(cls, config: Dict[str, Any]):

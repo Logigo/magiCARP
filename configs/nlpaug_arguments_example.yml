@@ -1,3 +1,4 @@
+data_pipeline: 'AugDataPipeline'
 augment_passages: true # only one of this
 augment_reviews: false # or this, should be true. will be enforced at runtime
 
@@ -16,7 +17,9 @@ augment_context_embedding:
     silence: True
     use_custom_api: True
 
-augment_lambada:
+augment_lambada: false
+
+hypothetical_augment_lambada:
     threshold: ~ # Use this instead of None
     min_length: 100
     max_length: 300

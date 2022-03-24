@@ -11,7 +11,7 @@ from transformers import PreTrainedModel
 import wandb
 from carp.clock import Clock
 from carp.configs import CARPConfig
-from carp.pytorch.data import BaseDataPipeline, get_datapipeline, get_nlpaug_config
+from carp.pytorch.data import BaseDataPipeline, get_datapipeline
 from carp.pytorch.model.architectures import get_architecture
 from carp.pytorch.scalability_utils import (
     fn_rank_0,
