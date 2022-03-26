@@ -100,6 +100,27 @@ def get_nlpaug_config(path: str) -> NLPAugConfig:
     return NLPAugConfig(augmenter_pipeline, augment_passages, augment_reviews, augmentation_likelihood)
 
 
+def _rand_augment(likelihood: float, passages: list[str], augmenter: naf.Pipeline) -> None:
+    """
+    Augments likelihood% of passages with each augmenter with uniform probability
+
+    Args:
+        likelihood:
+        passages:
+        augmenter:
+
+    Returns:
+
+    """
+    num_aug_data = math.ceil(len(passages) * likelihood)
+    indices_of_data_to_augment = np.random.choice(np.arange(len(passages)), size=num_aug_data,
+                                                  replace=False)
+    data_to_augment = passages[indices_of_data_to_augment]
+    # Split into number of augmenters?
+    augmented_slice = augmenter.augment(list(data_to_augment))
+    passages[indices_of_data_to_augment] = augmented_slice
+
+
 @register_datapipeline
 class AugDataPipeline(BaseDataPipeline):
     """Dataset wrapper class to ease working with the CARP dataset and Pytorch data utilities."""
@@ -138,16 +159,10 @@ class AugDataPipeline(BaseDataPipeline):
             augmenter = pipeline_config.augmenter_flow
 
             if pipeline_config.augment_reviews:
-                num_aug_data = math.ceil(len(passages) * pipeline_config.augmentation_likelihood)
-                indices_of_data_to_augment = np.random.choice(np.arange(len(augmented_reviews)), size=num_aug_data,
-                                                              replace=False)
-                data_to_augment = augmented_reviews[indices_of_data_to_augment]
-                # Split into number of augmenters?
-                augmented_slice = augmenter.augment(list(data_to_augment))
-                augmented_reviews[indices_of_data_to_augment] = augmented_slice
+                _rand_augment(pipeline_config.augmentation_likelihood, list(augmented_reviews), augmenter)
 
             if pipeline_config.augment_passages:
-                augmented_passages = augmenter.augment(list(augmented_passages))
+                _rand_augment(pipeline_config.augmentation_likelihood, list(augmented_passages), augmenter)
 
             pass_tokens, rev_tokens = _tok(augmented_passages), _tok(augmented_reviews)
             pass_masks = pass_tokens["attention_mask"]
