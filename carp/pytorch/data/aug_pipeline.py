@@ -1,9 +1,11 @@
+import math
 from dataclasses import dataclass
 from typing import Any
 
 import nlpaug.augmenter.sentence as nas
+import nlpaug.augmenter.word as naw
 import nlpaug.flow as naf
-from torchtyping import TensorType
+import numpy as np
 
 from carp.configs import DataPipelineConfig
 from carp.pytorch.data import *
@@ -12,6 +14,11 @@ from carp.pytorch.model.encoders import BaseEncoder
 
 def extract_augmenter_args(config: dict, key: str) -> Tuple[bool, dict[str, Any] or None]:
     """
+    Returns arguments for augmenter specified by key.
+
+    Notes:
+    An empty dict in .yml is valid, cause augmenters can take no args (i.e. default kwargs).
+    If it doesn't exist, it should NOT be added, and should be set to None.
 
     Args:
         key: key of augmenter to extract arguments of
@@ -24,15 +31,13 @@ def extract_augmenter_args(config: dict, key: str) -> Tuple[bool, dict[str, Any]
 
             a dictionary (potentially empty) which contains kwargs for the augmenter.
                 None if the augmenter is not in config
-
-
     """
     if key in config:
         arg: dict or bool = config.get(key)
         if type(arg) is bool:
             if arg:
                 arg = dict()
-            else: # When the config file explicitly specifies not to use the augment via a bool
+            else:  # When the config file explicitly specifies not to use the augment via a bool
                 return False, None
         return True, arg
     else:
@@ -41,10 +46,10 @@ def extract_augmenter_args(config: dict, key: str) -> Tuple[bool, dict[str, Any]
 
 @dataclass
 class NLPAugConfig:
-    augmenter_flow: naf.Sometimes
+    augmenter_flow: naf.Pipeline
     augment_passages: bool
     augment_reviews: bool
-    aug_p: float
+    augmentation_likelihood: float
 
 
 def get_nlpaug_config(path: str) -> NLPAugConfig:
@@ -52,34 +57,47 @@ def get_nlpaug_config(path: str) -> NLPAugConfig:
     args: dict = pipeline_config.args
     augment_reviews: bool = args.get('augment_reviews', False)
     augment_passages: bool = args.get('augment_passages', False)
-    aug_p: float = args.get('aug_p', None)
+    augmentation_likelihood: float = args.get('augmentation_likelihood', None)
+    if augmentation_likelihood > 1.0 or augmentation_likelihood < 0.0:
+        raise ValueError(f'Augmentation likelihood should be between 0 and 1, received: {augmentation_likelihood}')
 
     if augment_passages and augment_reviews or (not augment_passages and not augment_reviews):
         print('WARNING: Both passages and reviews are being augmented.')
 
-    # An empty dict in .yml is valid, cause this augmenter can take no args. If it doesn't exist, it should
-    #  NOT be added, and should be set to None. This is why extract_augmenter_args is abstracted into its own fn
-    has_cwe, augment_context_embedding = extract_augmenter_args(args, 'augment_context_embedding')
-    has_lambada, augment_lambada = extract_augmenter_args(args, 'augment_lambada')
-    model_directory: str = args.get('lambada_model_directory', None)
-    has_abs_sum, augment_abstractive_summarization = extract_augmenter_args(args,
-                                                                            'augment_abstractive_summarization')
-    has_rand, augment_random_behavior = extract_augmenter_args(args, 'augment_random_behavior')
+    # Sentence Augmentations
 
-    # Initialize augmenter objects with extracted kwargs
-    contextual_word_embedding_aug = nas.ContextualWordEmbsForSentenceAug(**augment_context_embedding) if has_cwe \
-        else None
-    # We don't check for both augment_lambada and model_directory so that it throws an error if a path is not
-    # specified and doesn't fail silently
-    lambada_aug = nas.LambadaAug(model_directory, **augment_lambada) if has_lambada else None
-    abstractive_summarization_aug = nas.AbstSummAug(**augment_abstractive_summarization) if has_abs_sum else None
-    random_sentence_augmenter = nas.RandomSentAug(**augment_random_behavior) if has_rand else None
+    has_cwe, context_embedding_args = extract_augmenter_args(args, 'augment_context_embedding')
+    has_lambada, lambada_args = extract_augmenter_args(args, 'augment_lambada')
+    model_directory: str = args.get('lambada_model_directory', None)
+    has_abs_sum, abs_sum_args = extract_augmenter_args(args, 'augment_abstractive_summarization')
+    has_rand, random_aug_args = extract_augmenter_args(args, 'augment_random_behavior')
+
+    # Word Augmentations
+    has_spelling, spelling_args = extract_augmenter_args(args, 'augment_spelling')
+    has_split, split_args = extract_augmenter_args(args, 'augment_split')
+    has_synonym, synonym_args = extract_augmenter_args(args, 'augment_synonym')
+    has_tfidf, tfidf_args = extract_augmenter_args(args, 'augment_tfidf')
+    has_backtranslation, backtranslation_args = extract_augmenter_args(args, 'augment_backtranslation')
+
+    # Sentence Augmentations
+    contextual_word_embedding_aug = nas.ContextualWordEmbsForSentenceAug(**context_embedding_args) if has_cwe else None
+    lambada_aug = nas.LambadaAug(model_directory, **lambada_args) if has_lambada else None
+    abstractive_summarization_aug = nas.AbstSummAug(**abs_sum_args) if has_abs_sum else None
+    random_sentence_augmenter = nas.RandomSentAug(**random_aug_args) if has_rand else None
+    # Word Augmentations
+    spelling_augmenter = naw.SpellingAug(**spelling_args) if has_spelling else None
+    split_augmenter = naw.SpellingAug(**split_args) if has_split else None
+    synonym_augmenter = naw.SynonymAug(**synonym_args) if has_synonym else None
+    tfidf_augmenter = naw.TfIdfAug(**tfidf_args) if has_tfidf else None
+    backtranslation_augmenter = naw.BackTranslationAug(**backtranslation_args) if has_backtranslation else None
 
     augmenters = [contextual_word_embedding_aug, lambada_aug, abstractive_summarization_aug,
-                  random_sentence_augmenter]
+                  random_sentence_augmenter, spelling_augmenter, split_augmenter, synonym_augmenter, tfidf_augmenter,
+                  backtranslation_augmenter]
 
-    augmenter_pipeline: naf.Sometimes = naf.Sometimes([aug for aug in augmenters if aug is not None], aug_p=aug_p)
-    return NLPAugConfig(augmenter_pipeline, augment_passages, augment_reviews, aug_p)
+    # Uses each augmenter with a certain probability, default is uniform across all augmenters passed in
+    augmenter_pipeline: naf.Pipeline = naf.Sometimes([aug for aug in augmenters if aug is not None])
+    return NLPAugConfig(augmenter_pipeline, augment_passages, augment_reviews, augmentation_likelihood)
 
 
 @register_datapipeline
@@ -120,7 +138,13 @@ class AugDataPipeline(BaseDataPipeline):
             augmenter = pipeline_config.augmenter_flow
 
             if pipeline_config.augment_reviews:
-                augmented_reviews = augmenter.augment(list(augmented_reviews))
+                num_aug_data = math.ceil(len(passages) * pipeline_config.augmentation_likelihood)
+                indices_of_data_to_augment = np.random.choice(np.arange(len(augmented_reviews)), size=num_aug_data,
+                                                              replace=False)
+                data_to_augment = augmented_reviews[indices_of_data_to_augment]
+                # Split into number of augmenters?
+                augmented_slice = augmenter.augment(list(data_to_augment))
+                augmented_reviews[indices_of_data_to_augment] = augmented_slice
 
             if pipeline_config.augment_passages:
                 augmented_passages = augmenter.augment(list(augmented_passages))
