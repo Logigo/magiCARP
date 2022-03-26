@@ -41,9 +41,10 @@ def extract_augmenter_args(config: dict, key: str) -> Tuple[bool, dict[str, Any]
 
 @dataclass
 class NLPAugConfig:
-    augmenter_sequence: naf.Sequential
+    augmenter_flow: naf.Sometimes
     augment_passages: bool
     augment_reviews: bool
+    aug_p: float
 
 
 def get_nlpaug_config(path: str) -> NLPAugConfig:
@@ -51,6 +52,7 @@ def get_nlpaug_config(path: str) -> NLPAugConfig:
     args: dict = pipeline_config.args
     augment_reviews: bool = args.get('augment_reviews', False)
     augment_passages: bool = args.get('augment_passages', False)
+    aug_p: float = args.get('aug_p', None)
 
     if augment_passages and augment_reviews or (not augment_passages and not augment_reviews):
         print('WARNING: Both passages and reviews are being augmented.')
@@ -76,13 +78,8 @@ def get_nlpaug_config(path: str) -> NLPAugConfig:
     augmenters = [contextual_word_embedding_aug, lambada_aug, abstractive_summarization_aug,
                   random_sentence_augmenter]
 
-    augmenter_pipeline: naf.Sequential = naf.Sequential([aug for aug in augmenters if aug is not None])
-    return NLPAugConfig(augmenter_pipeline, augment_passages, augment_reviews)
-
-
-def augment_labels_tokens() -> TensorType:
-    # TODO
-    pass
+    augmenter_pipeline: naf.Sometimes = naf.Sometimes([aug for aug in augmenters if aug is not None], aug_p=aug_p)
+    return NLPAugConfig(augmenter_pipeline, augment_passages, augment_reviews, aug_p)
 
 
 @register_datapipeline
@@ -120,16 +117,14 @@ class AugDataPipeline(BaseDataPipeline):
             # Augmentation happens here
             augmented_passages: list[str] = passages
             augmented_reviews: list[str] = reviews
-            # TODO: Add Flow args to config to pass into augmenterseqeunce.augment
-            # TODO: Should we be able to augment both?
-            # TODO: Superclass kwargs shouild go to config file
+            augmenter = pipeline_config.augmenter_flow
+
             if pipeline_config.augment_reviews:
-                augmented_reviews = pipeline_config.augmenter_sequence.augment(augmented_reviews)
+                augmented_reviews = augmenter.augment(list(augmented_reviews))
 
             if pipeline_config.augment_passages:
-                augmented_passages = pipeline_config.augmenter_sequence.augment(augmented_passages)
-            # [a, b, c] --> [1, 2, 3]
-            # [a+, b+, c+] --> [1, 2, 3]
+                augmented_passages = augmenter.augment(list(augmented_passages))
+
             pass_tokens, rev_tokens = _tok(augmented_passages), _tok(augmented_reviews)
             pass_masks = pass_tokens["attention_mask"]
             rev_masks = rev_tokens["attention_mask"]

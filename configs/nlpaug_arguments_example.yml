@@ -2,6 +2,12 @@ data_pipeline: 'AugDataPipeline'
 augment_passages: true # only one of this
 augment_reviews: false # or this, should be true. will be enforced at runtime
 
+aug_p: 0.2
+
+flow:
+    n: 1
+    num_thread: 1
+
 augment_context_embedding:
     model_path: 'gpt2'
     model_type: ''
