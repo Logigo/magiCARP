@@ -3,7 +3,7 @@ augment_passages: true
 augment_reviews: false
 
 # Probability that each data point will be augmented
-augmentation_likelihood: 0.2
+augmentation_likelihood: 1.0
 
 flow:
     n: 1
@@ -20,7 +20,7 @@ augment_backtranslation:
 
 augment_tfidf:
     model_path: '.'
-    action: substitute,
+    action: substitute
     name: TfIdf_Aug
     aug_min: 1
     aug_max: 10
@@ -73,60 +73,60 @@ augment_spelling:
     verbose: 0
 # Sentence Augmentations:
 
-augment_context_embedding:
-    model_path: 'gpt2'
-    model_type: ''
-    name: ContextualWordEmbsForSentence_Aug
-    min_length: 100
-    max_length: 500
-    batch_size: 32
-    temperature: 1.0
-    top_k: 50
-    top_p:  0.9
-    device: 'cpu'
-    force_reload: False
-    silence: True
-    use_custom_api: True
-
-augment_lambada: false
-
-hypothetical_augment_lambada:
-    threshold: ~ # Use this instead of None
-    min_length: 100
-    max_length: 300
-    batch_size: 16
-    temperature: 1.0
-    top_k: 50
-    top_p: 0.9
-    repetition_penalty: 1.0
-    name: Lambada_Aug
-    device: 'cpu'
-    force_reload: false
-    verbose: 0
-
-lambada_model_directory: "" # Needs to be filled out as a non-optional variable for Lambada. Will be enforced at runtime
-
-augment_abstractive_summarization:
-    model_path: t5-base
-    tokenizer_path: t5-base
-    min_length: 20
-    max_length: 50
-    batch_size: 32
-    temperature: 1.0
-    top_k: 50
-    top_p:  0.9
-    name: AbstSumm_Aug
-    device: 'cpu'
-    force_reload: false
-    verbose: int = 0
-    use_custom_api: true
-
-augment_random_behavior:
-    mode: neighbor
-    action: swap # https://github.com/makcedward/nlpaug/blob/bb2fc63349bf949f6f6047ff447a0efb16983c0a/nlpaug/util/action.py
-    name: RandomSent_Aug
-    aug_min: 1
-    aug_max: 10
-    aug_p: 0.3
-    tokenizer: None
-    verbose: 0
+#augment_context_embedding:
+#    model_path: 'gpt2'
+#    model_type: ''
+#    name: ContextualWordEmbsForSentence_Aug
+#    min_length: 100
+#    max_length: 500
+#    batch_size: 32
+#    temperature: 1.0
+#    top_k: 50
+#    top_p:  0.9
+#    device: 'cpu'
+#    force_reload: False
+#    silence: True
+#    use_custom_api: True
+#
+#augment_lambada: false
+#
+#hypothetical_augment_lambada:
+#    threshold: ~ # Use this instead of None
+#    min_length: 100
+#    max_length: 300
+#    batch_size: 16
+#    temperature: 1.0
+#    top_k: 50
+#    top_p: 0.9
+#    repetition_penalty: 1.0
+#    name: Lambada_Aug
+#    device: 'cpu'
+#    force_reload: false
+#    verbose: 0
+#
+#lambada_model_directory: "" # Needs to be filled out as a non-optional variable for Lambada. Will be enforced at runtime
+#
+#augment_abstractive_summarization:
+#    model_path: t5-base
+#    tokenizer_path: t5-base
+#    min_length: 20
+#    max_length: 50
+#    batch_size: 32
+#    temperature: 1.0
+#    top_k: 50
+#    top_p:  0.9
+#    name: AbstSumm_Aug
+#    device: 'cpu'
+#    force_reload: false
+#    verbose: int = 0
+#    use_custom_api: true
+#
+#augment_random_behavior:
+#    mode: neighbor
+#    action: swap # https://github.com/makcedward/nlpaug/blob/bb2fc63349bf949f6f6047ff447a0efb16983c0a/nlpaug/util/action.py
+#    name: RandomSent_Aug
+#    aug_min: 1
+#    aug_max: 10
+#    aug_p: 0.3
+#    tokenizer: None
+#    verbose: 0

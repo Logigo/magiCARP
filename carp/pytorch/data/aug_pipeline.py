@@ -65,7 +65,7 @@ def get_nlpaug_config(path: str) -> NLPAugConfig:
         print('WARNING: Both passages and reviews are being augmented.')
 
     # Sentence Augmentations
-
+    # Skip cause nd.array shenanigans
     has_cwe, context_embedding_args = extract_augmenter_args(args, 'augment_context_embedding')
     has_lambada, lambada_args = extract_augmenter_args(args, 'augment_lambada')
     model_directory: str = args.get('lambada_model_directory', None)
@@ -80,27 +80,29 @@ def get_nlpaug_config(path: str) -> NLPAugConfig:
     has_backtranslation, backtranslation_args = extract_augmenter_args(args, 'augment_backtranslation')
 
     # Sentence Augmentations
+
     contextual_word_embedding_aug = nas.ContextualWordEmbsForSentenceAug(**context_embedding_args) if has_cwe else None
     lambada_aug = nas.LambadaAug(model_directory, **lambada_args) if has_lambada else None
     abstractive_summarization_aug = nas.AbstSummAug(**abs_sum_args) if has_abs_sum else None
     random_sentence_augmenter = nas.RandomSentAug(**random_aug_args) if has_rand else None
     # Word Augmentations
     spelling_augmenter = naw.SpellingAug(**spelling_args) if has_spelling else None
-    split_augmenter = naw.SpellingAug(**split_args) if has_split else None
+    split_augmenter = naw.SplitAug(**split_args) if has_split else None
     synonym_augmenter = naw.SynonymAug(**synonym_args) if has_synonym else None
-    tfidf_augmenter = naw.TfIdfAug(**tfidf_args) if has_tfidf else None
+    # tfidf_augmenter = naw.TfIdfAug(**tfidf_args) if has_tfidf else None
     backtranslation_augmenter = naw.BackTranslationAug(**backtranslation_args) if has_backtranslation else None
 
     augmenters = [contextual_word_embedding_aug, lambada_aug, abstractive_summarization_aug,
-                  random_sentence_augmenter, spelling_augmenter, split_augmenter, synonym_augmenter, tfidf_augmenter,
+                  random_sentence_augmenter, spelling_augmenter, split_augmenter, synonym_augmenter,  # tfidf_augmenter,
                   backtranslation_augmenter]
 
     # Uses each augmenter with a certain probability, default is uniform across all augmenters passed in
-    augmenter_pipeline: naf.Pipeline = naf.Sometimes([aug for aug in augmenters if aug is not None])
+    # TODO: Change this to Sometimes eventually
+    augmenter_pipeline: naf.Pipeline = naf.Sequential([aug for aug in augmenters if aug is not None])
     return NLPAugConfig(augmenter_pipeline, augment_passages, augment_reviews, augmentation_likelihood)
 
 
-def _rand_augment(likelihood: float, passages: list[str], augmenter: naf.Pipeline) -> None:
+def _rand_augment(likelihood: float, passages: list[str], augmenter: naf.Pipeline) -> list[str]:
     """
     Augments likelihood% of passages with each augmenter with uniform probability
 
@@ -112,13 +114,16 @@ def _rand_augment(likelihood: float, passages: list[str], augmenter: naf.Pipelin
     Returns:
 
     """
+    passages = np.array(passages)
     num_aug_data = math.ceil(len(passages) * likelihood)
     indices_of_data_to_augment = np.random.choice(np.arange(len(passages)), size=num_aug_data,
                                                   replace=False)
     data_to_augment = passages[indices_of_data_to_augment]
-    # Split into number of augmenters?
-    augmented_slice = augmenter.augment(list(data_to_augment))
+    # Haha
+    augmented_slice = augmenter.augment(data_to_augment)
+
     passages[indices_of_data_to_augment] = augmented_slice
+    return list(passages)
 
 
 @register_datapipeline
@@ -154,15 +159,16 @@ class AugDataPipeline(BaseDataPipeline):
 
             passages, reviews = zip(*data)
             # Augmentation happens here
-            augmented_passages: list[str] = passages
-            augmented_reviews: list[str] = reviews
+            augmented_passages: list[str] = list(passages)
+            augmented_reviews: list[str] = list(reviews)
             augmenter = pipeline_config.augmenter_flow
 
             if pipeline_config.augment_reviews:
-                _rand_augment(pipeline_config.augmentation_likelihood, list(augmented_reviews), augmenter)
+                augmented_reviews = _rand_augment(pipeline_config.augmentation_likelihood, augmented_reviews, augmenter)
 
             if pipeline_config.augment_passages:
-                _rand_augment(pipeline_config.augmentation_likelihood, list(augmented_passages), augmenter)
+                augmented_passages = _rand_augment(pipeline_config.augmentation_likelihood, augmented_passages,
+                                                   augmenter)
 
             pass_tokens, rev_tokens = _tok(augmented_passages), _tok(augmented_reviews)
             pass_masks = pass_tokens["attention_mask"]
