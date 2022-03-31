@@ -120,7 +120,7 @@ def _rand_augment(likelihood: float, passages: list[str], augmenter: naf.Pipelin
                                                   replace=False)
     data_to_augment = passages[indices_of_data_to_augment]
     # Haha
-    augmented_slice = augmenter.augment(data_to_augment)
+    augmented_slice = augmenter.augment(list(data_to_augment))
 
     passages[indices_of_data_to_augment] = augmented_slice
     return list(passages)
